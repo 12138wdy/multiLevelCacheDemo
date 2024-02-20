@@ -1,6 +1,7 @@
 package com.heima.item.web;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.github.benmanes.caffeine.cache.Cache;
 import com.heima.item.pojo.Item;
 import com.heima.item.pojo.ItemStock;
 import com.heima.item.pojo.PageDTO;
@@ -20,11 +21,15 @@ public class ItemController {
     private IItemService itemService;
     @Autowired
     private IItemStockService stockService;
+    @Autowired
+    private Cache<Long, Item> itemCache;
+    @Autowired
+    private Cache<Long, ItemStock> itemStockCache;
 
     @GetMapping("list")
     public PageDTO queryItemPage(
             @RequestParam(value = "page", defaultValue = "1") Integer page,
-            @RequestParam(value = "size", defaultValue = "5") Integer size){
+            @RequestParam(value = "size", defaultValue = "5") Integer size) {
         // 分页查询商品
         Page<Item> result = itemService.query()
                 .ne("status", 3)
@@ -42,7 +47,7 @@ public class ItemController {
     }
 
     @PostMapping
-    public void saveItem(@RequestBody Item item){
+    public void saveItem(@RequestBody Item item) {
         itemService.saveItem(item);
     }
 
@@ -52,24 +57,24 @@ public class ItemController {
     }
 
     @PutMapping("stock")
-    public void updateStock(@RequestBody ItemStock itemStock){
+    public void updateStock(@RequestBody ItemStock itemStock) {
         stockService.updateById(itemStock);
     }
 
     @DeleteMapping("/{id}")
-    public void deleteById(@PathVariable("id") Long id){
+    public void deleteById(@PathVariable("id") Long id) {
         itemService.update().set("status", 3).eq("id", id).update();
     }
 
     @GetMapping("/{id}")
-    public Item findById(@PathVariable("id") Long id){
-        return itemService.query()
-                .ne("status", 3).eq("id", id)
-                .one();
+    public Item findById(@PathVariable("id") Long id) {
+        return itemCache.get(id, key -> itemService.query()
+                .ne("status", 3).eq("id", key)
+                .one());
     }
 
     @GetMapping("/stock/{id}")
-    public ItemStock findStockById(@PathVariable("id") Long id){
-        return stockService.getById(id);
+    public ItemStock findStockById(@PathVariable("id") Long id) {
+        return itemStockCache.get(id, key -> stockService.getById(key));
     }
 }
